@@ -3,6 +3,7 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <cassert>
+#include <cmath>
 
 #include "ouster/os1.h"
 #include "ouster/os1_packet.h"
@@ -33,14 +34,24 @@ sensor_msgs::Imu packet_to_imu_msg(const PacketMsg& p,
     m.header.stamp.fromNSec(imu_gyro_ts(buf));
     m.header.frame_id = frame;
 
-    m.orientation.x = 0;
-    m.orientation.y = 0;
-    m.orientation.z = 0;
-    m.orientation.w = 0;
-
     m.linear_acceleration.x = imu_la_x(buf) * standard_g;
     m.linear_acceleration.y = imu_la_y(buf) * standard_g;
     m.linear_acceleration.z = imu_la_z(buf) * standard_g;
+
+    //Added by David Alejo and Simon Martinez for estimating roll and pitch (source: https://mwrona.com/posts/accel-roll-pitch/)
+    double roll_ , pitch_ ;
+    pitch_ = asin(m.linear_acceleration.x/standard_g);
+    roll_ = atan(m.linear_acceleration.y/m.linear_acceleration.z);
+
+    tf2::Quaternion q_;
+    q_.setRPY(roll_,pitch_,0.0);
+
+    m.orientation.x = q_.x();
+    m.orientation.y = q_.y();
+    m.orientation.z = q_.z();
+    m.orientation.w = q_.w();
+
+    // End (D. Alejo & S. Martinez)
 
     m.angular_velocity.x = imu_av_x(buf) * M_PI / 180.0;
     m.angular_velocity.y = imu_av_y(buf) * M_PI / 180.0;
